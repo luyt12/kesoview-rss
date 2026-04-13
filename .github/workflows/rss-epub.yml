@@ -1,0 +1,111 @@
+name: RSS to EPUB
+
+on:
+  workflow_dispatch:
+    inputs:
+      rss_url:
+        description: 'RSS Feed URL'
+        required: false
+        default: 'http://feed.feedsky.com/my1510'
+      book_title:
+        description: 'Book Title'
+        required: false
+        default: 'my1510 文集'
+      book_author:
+        description: 'Author'
+        required: false
+        default: 'my1510'
+
+jobs:
+  rss-to-epub:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install RSS deps
+        run: pip install feedparser html2text
+
+      - name: Clone epub generator
+        run: |
+          git clone --depth 1 https://github.com/joeseesun/qiaomu-epub-book-generator.git /tmp/qiaomu-epub
+          pip install ebooklib markdown Pillow beautifulsoup4
+
+      - name: Fetch RSS articles
+        env:
+          RSS_URL: ${{ inputs.rss_url || 'http://feed.feedsky.com/my1510' }}
+          BOOK_TITLE: ${{ inputs.book_title || 'my1510 文集' }}
+          BOOK_AUTHOR: ${{ inputs.book_author || 'my1510' }}
+        run: |
+          python3 << 'PYEOF'
+          import feedparser, html2text, os, urllib.request
+
+          rss_url = """http://feed.feedsky.com/my1510"""
+          out_dir = os.path.expanduser("~/rss_articles")
+          os.makedirs(out_dir, exist_ok=True)
+
+          print(f"Fetching: {rss_url}")
+          try:
+              feed = feedparser.parse(rss_url)
+          except Exception as e:
+              # Fallback: try https
+              rss_url = rss_url.replace("http://", "https://")
+              feed = feedparser.parse(rss_url)
+          
+          print(f"Total entries: {len(feed.entries)}")
+          if len(feed.entries) == 0:
+              print("WARNING: No entries found!")
+              for key in ['bozo', 'bozo_exception']:
+                  if hasattr(feed, key) and getattr(feed, key):
+                      print(f"Bozo: {getattr(feed, key)}")
+
+          h = html2text.HTML2Text()
+          h.ignore_links = False
+
+          count = 0
+          for entry in feed.entries[:30]:
+              title = entry.get('title', 'No Title')
+              safe_title = "".join(c if c.isalnum() or c in ' -_' else '_' for c in title)[:80]
+              content = entry.get('summary', '') or (entry.get('content', [{}])[0].get('value', '') if entry.get('content') else '')
+              text = h.handle(content)
+              
+              filepath = os.path.join(out_dir, f"{safe_title}.md")
+              with open(filepath, 'w', encoding='utf-8') as f:
+                  f.write(f"# {title}\n\n")
+                  f.write(text)
+              count += 1
+              print(f"  [{count}] {title[:60]}")
+
+          print(f"Done: {count} articles saved")
+          print(f"OUT_DIR={out_dir}")
+          PYEOF
+
+      - name: Generate EPUB
+        env:
+          BOOK_TITLE: ${{ inputs.book_title || 'my1510 文集' }}
+          BOOK_AUTHOR: ${{ inputs.book_author || 'my1510' }}
+        run: |
+          python3 /tmp/qiaomu-epub/scripts/gen_epub_enhanced.py \
+            ~/rss_articles \
+            ./output.epub \
+            --title "$BOOK_TITLE" \
+            --author "$BOOK_AUTHOR" \
+            --cover-svg \
+            --cover-theme tech \
+            --image-quality 85
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: rss-epub-output
+          path: output.epub
+          retention-days: 7
