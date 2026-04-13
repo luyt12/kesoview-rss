@@ -7,18 +7,14 @@ jobs:
   debug:
     runs-on: ubuntu-latest
     steps:
-      - name: Try URLs
+      - name: Test exact URL
         run: |
-          for url in \
-            "https://feedmaker.kindle4rss.com/kesoview.weixin.xml" \
-            "https://feedmaker.kindle4rss.com/kesoview.xml" \
-            "https://kindle4rss.com/feeds/kesoview.weixin.xml" \
-            "https://rsshub.app/kindle4rss/kesoview"; do
-            echo "=== $url ==="
-            status=$(curl -sL -o /tmp/test.xml -w "%{http_code}" --max-time 10 "$url")
-            echo "Status: $status"
-            if [ "$status" = "200" ]; then
-              echo "FOUND! Size=$(wc -c < /tmp/test.xml)"
-              head -c 150 /tmp/test.xml
-            fi
-          done
+          url="https://feedmaker.kindle4rss.com/feeds/kesoview.weixin.xml"
+          echo "Testing: $url"
+          echo "--- Response Headers ---"
+          curl -sI -o /dev/null -w "HTTP %{http_code}\nLocation: %{redirect_url}\nContent-Type: %{content_type}\ncf-cache-status: %{header_json cf-cache-status}\n" --max-time 15 "$url"
+          echo "--- Response Body (first 500 chars) ---"
+          curl -sL --max-time 15 "$url" | head -c 500
+          echo ""
+          echo "--- DNS lookup ---"
+          dig +short feedmaker.kindle4rss.com || nslookup feedmaker.kindle4rss.com
