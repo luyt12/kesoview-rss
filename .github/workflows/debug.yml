@@ -1,0 +1,26 @@
+name: Debug RSS URL
+
+on:
+  workflow_dispatch:
+
+jobs:
+  debug:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Try different URL paths
+        run: |
+          for url in \
+            "https://feedmaker.kindle4rss.com/kesoview.weixin.xml" \
+            "https://feedmaker.kindle4rss.com/kesoview.xml" \
+            "https://kindle4rss.com/feeds/kesoview.weixin.xml" \
+            "https://rsshub.app/kindle4rss/kesoview.weixin" \
+            "https://rsshub.app/kindle4rss/kesoview"; do
+            echo "=== $url ==="
+            status=$(curl -sL -o /tmp/test.xml -w "%{http_code}" --max-time 10 "$url")
+            echo "Status: $status"
+            if [ "$status" = "200" ]; then
+              echo "FOUND! Size=$(wc -c < /tmp/test.xml)"
+              head -c 150 /tmp/test.xml
+              echo ""
+            fi
+          done
