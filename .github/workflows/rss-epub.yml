@@ -21,7 +21,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      id-token: write
 
     steps:
       - name: Checkout repo
@@ -43,41 +42,51 @@ jobs:
       - name: Fetch RSS articles
         env:
           RSS_URL: ${{ inputs.rss_url || 'http://feed.feedsky.com/my1510' }}
-          BOOK_TITLE: ${{ inputs.book_title || 'my1510 文集' }}
-          BOOK_AUTHOR: ${{ inputs.book_author || 'my1510' }}
         run: |
           python3 << 'PYEOF'
-          import feedparser, html2text, os, urllib.request
+          import feedparser
+          import html2text
+          import os
+          import sys
 
-          rss_url = """http://feed.feedsky.com/my1510"""
+          rss_url = os.environ.get('RSS_URL', 'http://feed.feedsky.com/my1510')
           out_dir = os.path.expanduser("~/rss_articles")
           os.makedirs(out_dir, exist_ok=True)
 
-          print(f"Fetching: {rss_url}")
-          try:
-              feed = feedparser.parse(rss_url)
-          except Exception as e:
-              # Fallback: try https
-              rss_url = rss_url.replace("http://", "https://")
-              feed = feedparser.parse(rss_url)
-          
-          print(f"Total entries: {len(feed.entries)}")
-          if len(feed.entries) == 0:
-              print("WARNING: No entries found!")
-              for key in ['bozo', 'bozo_exception']:
-                  if hasattr(feed, key) and getattr(feed, key):
-                      print(f"Bozo: {getattr(feed, key)}")
+          print(f"RSS_URL from env: {rss_url}")
+
+          # Try HTTP first, then HTTPS
+          feed = None
+          for url in [rss_url, rss_url.replace("http://", "https://")]:
+              print(f"Trying: {url}")
+              try:
+                  feed = feedparser.parse(url)
+                  print(f"  Parsed, entries={len(feed.entries)}")
+                  if len(feed.entries) > 0:
+                      rss_url = url
+                      break
+                  bozo = getattr(feed, 'bozo_exception', None)
+                  if bozo:
+                      print(f"  Bozo: {bozo}")
+              except Exception as e:
+                  print(f"  Error: {e}")
+
+          if feed is None or len(feed.entries) == 0:
+              print("FATAL: No RSS entries found!")
+              sys.exit(1)
 
           h = html2text.HTML2Text()
           h.ignore_links = False
 
           count = 0
-          for entry in feed.entries[:30]:
+          for entry in feed.entries[:50]:
               title = entry.get('title', 'No Title')
               safe_title = "".join(c if c.isalnum() or c in ' -_' else '_' for c in title)[:80]
-              content = entry.get('summary', '') or (entry.get('content', [{}])[0].get('value', '') if entry.get('content') else '')
-              text = h.handle(content)
-              
+              raw_content = entry.get('summary') or ''
+              if not raw_content and entry.get('content'):
+                  raw_content = entry.content[0].get('value', '')
+              text = h.handle(raw_content)
+
               filepath = os.path.join(out_dir, f"{safe_title}.md")
               with open(filepath, 'w', encoding='utf-8') as f:
                   f.write(f"# {title}\n\n")
@@ -85,9 +94,17 @@ jobs:
               count += 1
               print(f"  [{count}] {title[:60]}")
 
-          print(f"Done: {count} articles saved")
-          print(f"OUT_DIR={out_dir}")
+          print(f"\nDONE: {count} articles saved to {out_dir}")
+          if count == 0:
+              print("FATAL: No articles saved!")
+              sys.exit(1)
           PYEOF
+
+      - name: Show downloaded articles
+        run: |
+          echo "=== Articles in ~/rss_articles ==="
+          ls -la ~/rss_articles/ | head -20
+          echo "Total: $(ls ~/rss_articles/*.md 2>/dev/null | wc -l) .md files"
 
       - name: Generate EPUB
         env:
