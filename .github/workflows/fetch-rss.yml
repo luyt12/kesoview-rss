@@ -1,0 +1,33 @@
+name: Fetch kesoview WeChat RSS Feed
+
+on:
+  schedule:
+    # 每天北京时间 8am = UTC 0am
+    - cron: "0 0 * * *"
+  workflow_dispatch:
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch RSS Feed
+        run: |
+          curl -sL "https://feedmaker.kindle4rss.com/feeds/kesoview.weixin.xml" -o kesoview.weixin.xml
+          if grep -q "<rss\|<feed" kesoview.weixin.xml; then
+            echo "SUCCESS: $(wc -c < kesoview.weixin.xml) bytes"
+          else
+            echo "FAILED"
+            cat kesoview.weixin.xml
+            exit 1
+          fi
+
+      - name: Commit and push
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git add kesoview.weixin.xml
+          git diff --staged --quiet && exit 0
+          git commit -m "📰 $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          git push
