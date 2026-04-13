@@ -1,0 +1,31 @@
+=== RSS Source Debug Results ===
+Date: Mon Apr 13 10:46:20 UTC 2026
+
+--- DNS TESTS ---
+[DNS] feedsky.com -> FAILED
+[DNS] feed.feedsky.com -> FAILED
+[DNS] feedmaker.kindle4rss.com -> 2606:4700:3037::6815:4636 feedmaker.kindle4rss.com
+2606:4700:3037::ac43:dc6e feedmaker.kindle4rss.com
+OK
+[DNS] rsshub.app -> 2606:4700:20::681a:d57 rsshub.app
+2606:4700:20::681a:c57 rsshub.app
+2606:4700:20::ac43:4743 rsshub.app
+OK
+
+--- RSS TESTS ---
+[HTTP] Testing: http://feed.feedsky.com/my1510
+  -> HTTP 000,  bytes
+[HTTPS] Testing: https://feed.feedsky.com/my1510
+  -> HTTP 000,  bytes
+[kindle4rss] Testing: http://feedmaker.kindle4rss.com/feeds/kesoview.weixin.xml
+  -> HTTP 404, 146 bytes
+[rsshub_app] Testing: https://rsshub.app/feedsky/my1510
+  -> HTTP 403, 386 bytes
+[rsshub_r2j] Testing: https://rsshub.app/rss2json?url=http://feed.feedsky.com/my1510
+  -> HTTP 403, 386 bytes
+[rss2json_api] Testing: https://api.rss2json.com/v1/api.json?rss_url=http://feed.feedsky.com/my1510
+  -> HTTP 500, 95 bytes
+[feedsky_www] Testing: https://www.feedsky.com/my1510/feed
+  -> HTTP 000, 95 bytes
+
+DONE
