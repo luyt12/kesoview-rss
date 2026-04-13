@@ -2,7 +2,6 @@ name: Fetch kesoview WeChat RSS Feed
 
 on:
   schedule:
-    # 每天北京时间 8am = UTC 0am
     - cron: "0 0 * * *"
   workflow_dispatch:
 
@@ -14,20 +13,20 @@ jobs:
 
       - name: Fetch RSS Feed
         run: |
-          curl -sL "https://feedmaker.kindle4rss.com/feeds/kesoview.weixin.xml" -o kesoview.weixin.xml
-          if grep -q "<rss\|<feed" kesoview.weixin.xml; then
-            echo "SUCCESS: $(wc -c < kesoview.weixin.xml) bytes"
-          else
-            echo "FAILED"
-            cat kesoview.weixin.xml
-            exit 1
-          fi
+          set -x
+          echo "Fetching RSS..."
+          curl -vL "https://feedmaker.kindle4rss.com/feeds/kesoview.weixin.xml" -o kesoview.weixin.xml 2>&1 | tee /tmp/curl.log
+          echo "---File info---"
+          ls -la kesoview.weixin.xml 2>&1 || echo "File not created"
+          echo "---First 500 bytes---"
+          head -c 500 kesoview.weixin.xml 2>/dev/null || echo "Cannot read"
 
       - name: Commit and push
+        if: success()
         run: |
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
           git add kesoview.weixin.xml
-          git diff --staged --quiet && exit 0
+          git diff --staged --quiet && { echo "No changes"; exit 0; }
           git commit -m "📰 $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
-          git push
+          git push && echo "Pushed successfully"
