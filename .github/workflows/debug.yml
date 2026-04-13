@@ -1,4 +1,4 @@
-name: Debug feedsky + rsshub
+name: Debug rsshub variants
 
 on:
   workflow_dispatch:
@@ -7,19 +7,18 @@ jobs:
   debug:
     runs-on: ubuntu-latest
     steps:
-      - name: Test feedsky via rsshub variants
+      - name: Test rsshub variants
         run: |
           for url in \
-            "https://rsshub.app/feedsky/my1510" \
-            "https://rsshub.app/feedfeeds/my1510" \
-            "https://rsshub.rssforever.com/feedsky/my1510" \
-            "https://rss.nodeseek.com/feedsky/my1510" \
-            "https://rsshub.moeyy.cn/feedsky/my1510" \
-            "https://rsshub.proxy.w единx.org/feedsky/my1510"; do
+            'https://rsshub.app/feedsky/my1510' \
+            'https://rsshub.moeyy.cn/feedsky/my1510' \
+            'https://rsshub.ioiox.com/feedsky/my1510' \
+            'https://rss.nodeseek.com/feedsky/my1510'; do
             echo "=== $url ==="
-            status=$(curl -sL -o /tmp/rsstest.xml -w "%{http_code}" --max-time 15 "$url")
-            echo "Status: $status, Size: $(wc -c < /tmp/rsstest.xml)"
+            status=$(curl -sL -o /tmp/rsstest.xml -w '%{http_code}' --max-time 15 "$url")
+            echo "Status: $status Size: $(wc -c < /tmp/rsstest.xml)"
             if [ "$status" = "200" ]; then
               head -c 200 /tmp/rsstest.xml
             fi
+            echo
           done
