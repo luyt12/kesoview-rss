@@ -1,4 +1,4 @@
-name: Debug rsshub variants
+name: Debug rsshub + alternatives
 
 on:
   workflow_dispatch:
@@ -7,18 +7,33 @@ jobs:
   debug:
     runs-on: ubuntu-latest
     steps:
-      - name: Test rsshub variants
+      - name: Test rsshub.app 403 response
         run: |
+          echo "=== rsshub.app/feedsky/my1510 ==="
+          curl -sL -o /tmp/r1.xml -w "HTTP %{http_code}\n" --max-time 15 'https://rsshub.app/feedsky/my1510'
+          echo "Body:"
+          head -c 300 /tmp/r1.xml
+          echo ""
+
+      - name: Test more rsshub instances
+        run: |
+          echo "=== Testing more instances ==="
           for url in \
-            'https://rsshub.app/feedsky/my1510' \
+            'https://rsshub.fly.dev/feedsky/my1510' \
             'https://rsshub.moeyy.cn/feedsky/my1510' \
+            'https://rsshub.rssforever.com/feedsky/my1510' \
             'https://rsshub.ioiox.com/feedsky/my1510' \
-            'https://rss.nodeseek.com/feedsky/my1510'; do
-            echo "=== $url ==="
-            status=$(curl -sL -o /tmp/rsstest.xml -w '%{http_code}' --max-time 15 "$url")
-            echo "Status: $status Size: $(wc -c < /tmp/rsstest.xml)"
-            if [ "$status" = "200" ]; then
-              head -c 200 /tmp/rsstest.xml
-            fi
-            echo
+            'https://rss.nodeseek.com/feedsky/my1510' \
+            'https://rss.nodeseek.com/feedfeeds/my1510'; do
+            echo "--- $url ---"
+            status=$(curl -sL -o /tmp/t.xml -w '%{http_code}' --max-time 10 "$url")
+            echo "Status: $status Size: $(wc -c < /tmp/t.xml)"
+          done
+
+      - name: DNS resolution test
+        run: |
+          echo "Testing DNS for common hosts..."
+          for host in 'feedsky.com' 'feed.feedsky.com' 'rsshub.app' 'rsshub.moeyy.cn' 'feedmaker.kindle4rss.com' 'kindle4rss.com'; do
+            echo -n "$host: "
+            dig +short $host A +time=5 +tries=1 2>/dev/null || echo "FAILED"
           done
