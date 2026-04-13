@@ -7,32 +7,40 @@ jobs:
   debug:
     runs-on: ubuntu-latest
     steps:
-      - name: Test RSS sources
+      - name: Test RSS sources one by one
         run: |
-          echo "=== DNS resolution ==="
+          test_url() {
+            local url="$1"
+            local label="$2"
+            echo "[$label] Testing: $url"
+            status=$(curl -sL -o /tmp/rsstest.xml -w "%{http_code}" --max-time 10 "$url" 2>/dev/null)
+            local exitcode=$?
+            if [ $exitcode -ne 0 ]; then
+              echo "  -> curl exit $exitcode (network error)"
+            else
+              echo "  -> HTTP $status, $(wc -c < /tmp/rsstest.xml) bytes"
+              if [ "$status" = "200" ]; then
+                echo "  -> CONTENT PREVIEW:"
+                head -c 150 /tmp/rsstest.xml
+                echo ""
+              fi
+            fi
+          }
+
+          echo "=== DNS TESTS ==="
           for host in feedsky.com feed.feedsky.com feedmaker.kindle4rss.com rsshub.app; do
-            echo -n "$host: "
-            getent hosts $host 2>/dev/null || nslookup $host 2>/dev/null | grep "Address:" | tail -1 || echo "DNS FAILED"
+            echo -n "[DNS] $host -> "
+            getent hosts $host 2>/dev/null && echo "OK" || echo "FAILED"
           done
 
           echo ""
-          echo "=== curl tests ==="
-          for url in \
-            "http://feed.feedsky.com/my1510" \
-            "https://feed.feedsky.com/my1510" \
-            "http://feedmaker.kindle4rss.com/feeds/kesoview.weixin.xml" \
-            "https://rsshub.app/feedsky/my1510" \
-            "https://rsshub.app/https://feed.feedsky.com/my1510" \
-            "https://rsshub.app/rss2json?url=http://feed.feedsky.com/my1510" \
-            "https://api.rss2json.com/v1/api.json?rss_url=http://feed.feedsky.com/my1510" \
-            "https://www.feedsky.com/feed/get?i=my1510" \
-            "https://www.feedsky.com/my1510/feed"; do
-            echo "--- $url ---"
-            status=$(curl -sL -o /tmp/rsstest.xml -w "%{http_code}" --max-time 15 "$url")
-            echo "Status: $status Size: $(wc -c < /tmp/rsstest.xml)"
-            if [ "$status" = "200" ]; then
-              echo "FIRST 200:"
-              head -c 200 /tmp/rsstest.xml
-              echo ""
-            fi
-          done
+          echo "=== RSS TESTS ==="
+          test_url "http://feed.feedsky.com/my1510" "HTTP"
+          test_url "https://feed.feedsky.com/my1510" "HTTPS"
+          test_url "http://feedmaker.kindle4rss.com/feeds/kesoview.weixin.xml" "kindle4rss"
+          test_url "https://rsshub.app/feedsky/my1510" "rsshub_app"
+          test_url "https://rsshub.app/rss2json?url=http://feed.feedsky.com/my1510" "rsshub_rss2json"
+          test_url "https://api.rss2json.com/v1/api.json?rss_url=http://feed.feedsky.com/my1510&api_key=" "rss2json_api"
+          test_url "https://www.feedsky.com/my1510/feed" "feedsky_www"
+          echo ""
+          echo "=== DONE ==="
