@@ -20,23 +20,6 @@ jobs:
           echo "Date: $(date)" >> $RESULTS
           echo "" >> $RESULTS
 
-          test_url() {
-            local url="$1"
-            local label="$2"
-            echo "[$label] Testing: $url" >> $RESULTS
-            status=$(curl -sL -o /tmp/rsstest.xml -w "%{http_code}" --max-time 10 "$url" 2>/dev/null)
-            local exitcode=$?
-            if [ $exitcode -ne 0 ]; then
-              echo "  -> curl exit $exitcode" >> $RESULTS
-            else
-              local size=$(wc -c < /tmp/rsstest.xml)
-              echo "  -> HTTP $status, $size bytes" >> $RESULTS
-              if [ "$status" = "200" ] && [ $size -gt 0 ]; then
-                echo "  -> PREVIEW: $(head -c 200 /tmp/rsstest.xml)" >> $RESULTS
-              fi
-            fi
-          }
-
           echo "--- DNS TESTS ---" >> $RESULTS
           for host in feedsky.com feed.feedsky.com feedmaker.kindle4rss.com rsshub.app; do
             echo -n "[DNS] $host -> " >> $RESULTS
@@ -45,19 +28,41 @@ jobs:
 
           echo "" >> $RESULTS
           echo "--- RSS TESTS ---" >> $RESULTS
-          test_url "http://feed.feedsky.com/my1510" "HTTP"
-          test_url "https://feed.feedsky.com/my1510" "HTTPS"
-          test_url "http://feedmaker.kindle4rss.com/feeds/kesoview.weixin.xml" "kindle4rss"
-          test_url "https://rsshub.app/feedsky/my1510" "rsshub_app"
-          test_url "https://rsshub.app/rss2json?url=http://feed.feedsky.com/my1510" "rsshub_r2j"
-          test_url "https://api.rss2json.com/v1/api.json?rss_url=http://feed.feedsky.com/my1510" "rss2json"
-          test_url "https://www.feedsky.com/my1510/feed" "feedsky_www"
+
+          # Test URLs individually, capture status without failing step
+          run_test() {
+            local url="$1"
+            local label="$2"
+            echo "[$label] Testing: $url" >> $RESULTS
+            local status
+            status=$(curl -sL -o /tmp/rsstest.xml -w "%{http_code}" --max-time 10 "$url" 2>/dev/null) || true
+            local exitcode=$?
+            if [ $exitcode -ne 0 ]; then
+              echo "  -> curl exit $exitcode" >> $RESULTS
+            else
+              local size=$(wc -c < /tmp/rsstest.xml)
+              echo "  -> HTTP $status, $size bytes" >> $RESULTS
+              if [ "$status" = "200" ] && [ $size -gt 10 ]; then
+                local preview=$(head -c 200 /tmp/rsstest.xml | tr '\n' ' ')
+                echo "  -> PREVIEW: $preview" >> $RESULTS
+              fi
+            fi
+          }
+
+          run_test "http://feed.feedsky.com/my1510" "HTTP"
+          run_test "https://feed.feedsky.com/my1510" "HTTPS"
+          run_test "http://feedmaker.kindle4rss.com/feeds/kesoview.weixin.xml" "kindle4rss"
+          run_test "https://rsshub.app/feedsky/my1510" "rsshub_app"
+          run_test "https://rsshub.app/rss2json?url=http://feed.feedsky.com/my1510" "rsshub_r2j"
+          run_test "https://api.rss2json.com/v1/api.json?rss_url=http://feed.feedsky.com/my1510" "rss2json_api"
+          run_test "https://www.feedsky.com/my1510/feed" "feedsky_www"
           
           echo "" >> $RESULTS
           echo "DONE" >> $RESULTS
           cat $RESULTS
 
       - name: Commit results
+        if: success() || true
         run: |
           git config --global user.name "luyt12"
           git config --global user.email "133572356+luyt12@users.noreply.github.com"
